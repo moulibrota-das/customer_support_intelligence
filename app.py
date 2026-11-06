@@ -1,7 +1,6 @@
-"""Streamlit demo: paste a message -> see each step's output and the draft reply.
+"""Streamlit demo: paste a message -> see the draft reply.
 
 Run:  streamlit run app.py
-UI polish is not the priority; showing every step (so each decision can be explained) is.
 """
 
 import streamlit as st
@@ -41,10 +40,9 @@ if st.button("Analyze", type="primary", disabled=not message.strip()):
         result = run_pipeline(message)
 
     tokens_in, tokens_out = result.total_tokens
-    c1, c2, c3 = st.columns(3)
+    c1, c2 = st.columns(2)
     c1.metric("End-to-end time", f"{result.wall_ms / 1000:.1f} s")
     c2.metric("Tokens in / out", f"{tokens_in} / {tokens_out}")
-    c3.metric("Preprocess flags", ", ".join(result.preprocess.flags) or "none")
 
     if result.preprocess.should_skip_llm:
         st.warning("Empty or garbage input: no LLM calls made. (Fallback reply arrives in Milestone 4.)")
@@ -53,17 +51,7 @@ if st.button("Analyze", type="primary", disabled=not message.strip()):
         st.subheader("Draft reply")
         st.info(result.draft.response)
 
-    st.subheader("Step by step")
+    # Step-by-step details are hidden; still surface failures so an empty result isn't a mystery.
     for t in result.traces:
-        label = f"{t.name} · {t.kind}"
-        if t.prompt_version:
-            label += f" · {t.prompt_version}"
-        label += f" · {t.latency_ms} ms"
-        if t.kind == "llm":
-            label += f" · {t.input_tokens}/{t.output_tokens} tokens · attempts {t.attempts}"
-        # Expand the LLM steps by default: that's where the interesting decisions are.
-        with st.expander(label, expanded=t.kind == "llm" or bool(t.error)):
-            if t.error:
-                st.error(t.error)
-            if t.output is not None:
-                st.json(t.output)
+        if t.error:
+            st.error(f"{t.name}: {t.error}")
