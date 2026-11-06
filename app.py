@@ -28,7 +28,7 @@ st.set_page_config(page_title="Customer Support Intelligence", layout="wide")
 st.title("Customer Support Intelligence")
 st.caption(f"Model: `{config.GEMINI_MODEL}` · prompts: "
            + ", ".join(f"{k} {v}" for k, v in config.PROMPT_VERSIONS.items())
-           + " · Status: Milestone 2 (rules, validation and final assembly not built yet)")
+           + "")
 
 choice = st.selectbox("Example", list(EXAMPLES))
 message = st.text_area("Customer message", value=EXAMPLES[choice], height=150)
