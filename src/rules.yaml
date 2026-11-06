@@ -1,0 +1,66 @@
+# Step 4 "Decide": business rules. The LLM supplies signals; these rules decide.
+# Edit this file to change behaviour; no Python changes needed.
+#
+# Conditions under `when` (all listed keys must match; list values mean "any of"):
+#   signals:        risk signals found by Extract (legal_threat, safety_issue, ...)
+#   intent:         primary or secondary intent
+#   frustration:    none | low | medium | high
+#   flags:          Step 0 flags (possible_prompt_injection, card_number_masked, ...)
+#   min_amount:     largest amount mentioned is >= this number
+#   sarcastic:      true/false
+#   max_confidence: classification confidence is below this number
+#   has_deadline:   true if the customer gave a deadline
+
+urgency_base: Low
+
+# Highest matching urgency wins.
+urgency_rules:
+  - { name: safety_issue -> Critical,     when: { signals: [safety_issue] },                    urgency: Critical }
+  - { name: security_concern -> Critical, when: { signals: [security_concern] },                urgency: Critical }
+  - { name: legal_threat -> Critical,     when: { signals: [legal_threat] },                    urgency: Critical }
+  - { name: repeat_contact -> High,       when: { signals: [repeat_contact] },                  urgency: High }
+  - { name: manager_request -> High,      when: { signals: [manager_request] },                 urgency: High }
+  - { name: public_exposure -> High,      when: { signals: [public_exposure_threat] },          urgency: High }
+  - { name: high_frustration -> High,     when: { frustration: [high] },                        urgency: High }
+  - { name: has_deadline -> High,         when: { has_deadline: true },                         urgency: High }
+  - { name: high_value_amount -> High,    when: { min_amount: 10000 },                          urgency: High }
+  - { name: churn_threat -> Medium,       when: { signals: [churn_threat] },                    urgency: Medium }
+  - { name: medium_frustration -> Medium, when: { frustration: [medium] },                      urgency: Medium }
+  - { name: money_or_access_issue -> Medium, when: { intent: [refund, billing, delivery, account_access, cancellation, technical_issue, complaint] }, urgency: Medium }
+
+# Any match -> escalate. A missed escalation is worse than an extra one.
+escalation_rules:
+  - { name: legal_threat,       when: { signals: [legal_threat] } }
+  - { name: safety_issue,       when: { signals: [safety_issue] } }
+  - { name: security_concern,   when: { signals: [security_concern] } }
+  - { name: manager_request,    when: { signals: [manager_request] } }
+  - { name: public_exposure,    when: { signals: [public_exposure_threat] } }
+  - { name: repeat_and_angry,   when: { signals: [repeat_contact], frustration: [medium, high] } }
+  - { name: high_value_and_angry, when: { min_amount: 10000, frustration: [medium, high] } }
+
+# Any match -> a human must look at it before anything is sent.
+review_rules:
+  - { name: low_confidence,    when: { max_confidence: 0.6 },                reason: "Classification confidence is low" }
+  - { name: unclear_intent,    when: { intent: [unclear] },                  reason: "Intent is unclear" }
+  - { name: spam_off_topic,    when: { intent: [spam_off_topic] },           reason: "Message looks like spam or off-topic" }
+  - { name: sarcasm,           when: { sarcastic: true },                    reason: "Sarcasm detected; tone may be misread" }
+  - { name: prompt_injection,  when: { flags: [possible_prompt_injection] }, reason: "Message tries to instruct the AI system" }
+  - { name: card_shared,       when: { flags: [card_number_masked] },        reason: "Customer shared a card number" }
+
+# Recommended action by primary intent.
+actions:
+  refund: "Review the refund request against the refund policy and confirm eligibility with the customer."
+  billing: "Check the customer's billing history and correct any wrong or duplicate charge."
+  technical_issue: "Troubleshoot the issue or arrange a repair/replacement under the warranty policy."
+  delivery: "Check the order's shipment status with the courier and give the customer a firm update."
+  account_access: "Verify the customer's identity and help restore account access."
+  product_question: "Answer the product question from product documentation."
+  complaint: "Acknowledge the complaint, investigate the cause and follow up with the customer."
+  cancellation: "Confirm the order/subscription and process the cancellation if eligible."
+  feedback: "Log the feedback and thank the customer."
+  spam_off_topic: "No customer action needed; close or ignore."
+  unclear: "Ask the customer for more details before taking action."
+default_action: "Route to human triage."
+
+# Used instead of the intent action when escalated.
+escalation_action: "Escalate to a senior agent now. Then: "

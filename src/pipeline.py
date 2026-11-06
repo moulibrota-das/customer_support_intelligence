@@ -1,7 +1,7 @@
 """Runs the steps in order and records a trace for each one.
 
-Milestone 2 state: Preprocess -> (Classify || Extract) -> Draft.
-Rules (Step 4), verification (Steps 3/6) and final assembly (Step 7) are added in later milestones.
+Milestone 3 state: Preprocess -> (Classify || Extract) -> Decide (rules) -> Draft.
+Verification (Steps 3/6) and final assembly (Step 7) are added in later milestones.
 """
 
 import time
@@ -14,6 +14,7 @@ from src.draft import draft
 from src.extract import extract
 from src.llm_client import GeminiClient, LLMClient
 from src.preprocess import preprocess
+from src.rules import decide
 from src.schemas import (ClassificationResult, Decision, DraftResult, ExtractionResult,
                          PreprocessResult, StepTrace)
 
@@ -65,6 +66,8 @@ def run_pipeline(message: str, client: LLMClient | None = None) -> PipelineResul
     result.traces += [cls_trace, ext_trace]
 
     if result.classification and result.extraction:
+        result.decision, decision_trace = decide(pre, result.classification, result.extraction)
+        result.traces.append(decision_trace)
         result.draft, draft_trace = draft(pre, result.classification, result.extraction, result.decision, client)
         if result.draft:
             result.draft.response = unmask(result.draft.response, pre)

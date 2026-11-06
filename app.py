@@ -6,6 +6,7 @@ Run:  streamlit run app.py
 import streamlit as st
 
 from src import config
+from src.assemble import assemble
 from src.pipeline import run_pipeline
 
 EXAMPLES = {
@@ -47,9 +48,22 @@ if st.button("Analyze", type="primary", disabled=not message.strip()):
     if result.preprocess.should_skip_llm:
         st.warning("Empty or garbage input: no LLM calls made. (Fallback reply arrives in Milestone 4.)")
 
-    if result.draft:
-        st.subheader("Draft reply")
-        st.info(result.draft.response)
+    final = assemble(result)
+    if final:
+        st.markdown(f"**Customer Intent:** {final.customer_intent}")
+        st.markdown(f"**Urgency:** {final.urgency.value}")
+        st.markdown("**Key Information:**")
+        for k, v in final.key_information.items():
+            st.markdown(f"- {k}: " + (v if isinstance(v, str) else "; ".join(v)))
+        st.markdown(f"**Recommended Action:** {final.recommended_action}")
+        st.markdown(f"**Escalation:** {'Yes' if final.escalation else 'No'}")
+        if final.needs_human_review:
+            st.warning("Needs human review: " + "; ".join(final.review_reasons))
+        st.markdown("**Draft Response:**")
+        st.info(final.draft_response)
+        st.markdown("**Reasoning / Evidence:**")
+        for line in final.reasoning_evidence:
+            st.markdown(f"- {line}")
 
     # Step-by-step details are hidden; still surface failures so an empty result isn't a mystery.
     for t in result.traces:
